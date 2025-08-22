@@ -7,7 +7,8 @@ export interface StudentData {
   Roll: string;
   Name: string;
   Preference: string;
-  Collected: string;
+  Status: string; // Changed from Collected
+  statusColumn: string; // To hold the column letter e.g. 'D'
 }
 
 // Configure Google Sheets API client
@@ -52,6 +53,17 @@ export async function getSheets(): Promise<string[]> {
   }
 }
 
+// Helper to convert column index to letter (0 -> A, 1 -> B)
+const colIndexToLetter = (colIndex: number) => {
+  let temp, letter = '';
+  while (colIndex >= 0) {
+    temp = colIndex % 26;
+    letter = String.fromCharCode(temp + 65) + letter;
+    colIndex = Math.floor(colIndex / 26) - 1;
+  }
+  return letter;
+}
+
 export async function searchRollNumber(
   sheetName: string,
   rollSuffix: string
@@ -63,7 +75,7 @@ export async function searchRollNumber(
   try {
     validateEnv();
     const sheets = await getSheetsClient();
-    const range = `${sheetName}!A:D`; // Assuming Roll is in Col A, Name in B, Preference in C, Collected in D
+    const range = `${sheetName}!A:Z`; // Read a wider range to find columns dynamically
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
@@ -77,10 +89,16 @@ export async function searchRollNumber(
 
     const header = rows[0];
     const rollIndex = header.indexOf('Roll');
+    const nameIndex = header.indexOf('Name');
+    const preferenceIndex = header.indexOf('Preference');
+    const statusIndex = header.indexOf('Status'); // Find status column
 
-    if (rollIndex === -1) {
-      return { data: null, error: 'Could not find "Roll" column in the sheet.' };
-    }
+    if (rollIndex === -1) return { data: null, error: 'Could not find "Roll" column.' };
+    if (nameIndex === -1) return { data: null, error: 'Could not find "Name" column.' };
+    if (preferenceIndex === -1) return { data: null, error: 'Could not find "Preference" column.' };
+    if (statusIndex === -1) return { data: null, error: 'Could not find "Status" column.' };
+    
+    const statusColumnLetter = colIndexToLetter(statusIndex);
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -88,10 +106,11 @@ export async function searchRollNumber(
       if (rollNumber && rollNumber.endsWith(rollSuffix)) {
         const studentData: StudentData = {
           rowIndex: i + 1, // 1-based index
-          Roll: row[header.indexOf('Roll')] || '',
-          Name: row[header.indexOf('Name')] || '',
-          Preference: row[header.indexOf('Preference')] || '',
-          Collected: row[header.indexOf('Collected')] || 'FALSE',
+          Roll: row[rollIndex] || '',
+          Name: row[nameIndex] || '',
+          Preference: row[preferenceIndex] || '',
+          Status: row[statusIndex] || 'Not Collected',
+          statusColumn: statusColumnLetter,
         };
         return { data: studentData, error: null };
       }
@@ -106,14 +125,13 @@ export async function searchRollNumber(
 
 export async function markAsCollected(
   sheetName: string,
-  roll: string,
   rowIndex: number,
+  statusColumn: string,
 ): Promise<{ success: boolean; error: string | null }> {
   try {
     validateEnv();
     const sheets = await getSheetsClient();
-    const collectedColumn = 'D'; // Assuming 'Collected' status is in column D
-    const range = `${sheetName}!${collectedColumn}${rowIndex}`;
+    const range = `${sheetName}!${statusColumn}${rowIndex}`;
     const timestamp = new Date().toISOString();
 
     await sheets.spreadsheets.values.update({
