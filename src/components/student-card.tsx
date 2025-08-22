@@ -19,19 +19,18 @@ export function StudentCard({ student, sheetName, onCollectionSuccess }: Student
   const [isUpdatePending, startUpdateTransition] = useTransition();
   const { toast } = useToast();
   
-  const isCollected = student.Collected.toUpperCase() !== 'FALSE';
+  const isCollected = student.Status.toUpperCase() !== 'NOT COLLECTED' && student.Status !== '';
   const isVeg = student.Preference.toUpperCase() === 'VEG';
 
   const handleCollect = () => {
     startUpdateTransition(async () => {
-      // Pass rowIndex to the action
-      const { success, error } = await markAsCollected(sheetName, student.Roll, student.rowIndex);
+      const { success, error } = await markAsCollected(sheetName, student.rowIndex, student.statusColumn);
       if (success) {
         toast({
           title: "Success",
           description: `${student.Name} marked as collected.`,
         });
-        const updatedStudentData = { ...student, Collected: new Date().toISOString() };
+        const updatedStudentData = { ...student, Status: new Date().toISOString() };
         onCollectionSuccess(updatedStudentData);
       } else {
         toast({
