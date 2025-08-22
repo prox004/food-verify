@@ -109,6 +109,8 @@ export function CollectionForm({ initialSheets }: { initialSheets: string[] }) {
                     key={index}
                     ref={inputRefs[index]}
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={1}
                     value={digit}
                     onChange={(e) => handleDigitChange(index, e.target.value)}
